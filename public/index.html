@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historical Event Describer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Historical Event Describer</h1>
+    <p>Describe any historical event in different styles and languages!</p>
+    
+    <form id="eventForm">
+        <div class="input-group">
+            <label for="event">Historical Event:</label>
+            <input type="text" id="event" placeholder="E.g., Moon Landing, French Revolution" required>
+        </div>
+        
+        <div class="input-group">
+            <label for="style">Description Style:</label>
+            <select id="style" required>
+                <option value="">-- Select a style --</option>
+                <option value="brainrot">Gen Z Brainrot</option>
+                <option value="old_english">Old English</option>
+                <option value="pirate">Pirate Speak</option>
+                <option value="shakespeare">Shakespearean</option>
+                <option value="valley_girl">Valley Girl</option>
+                <option value="tech_bro">Tech Bro Jargon</option>
+                <option value="noir">Film Noir</option>
+            </select>
+        </div>
+        
+        <button type="submit">Describe Event</button>
+    </form>
+    
+    <div id="result"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
