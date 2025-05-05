@@ -34,6 +34,11 @@ const voice = new ElevenLabs({
     voiceId: "EXAVITQu4vr4xnSDxMaL" // Default voice ID
 });
 
+const italianBrainrot = new ElevenLabs({
+  apiKey: process.env.ELEVENLABS_API_KEY,
+  voiceId: "pNInz6obpgDQGcFmaJgB" 
+});
+
 const pirateVoice = new ElevenLabs({
     apiKey: process.env.ELEVENLABS_API_KEY,
     voiceId: "PPzYpIqttlTYA83688JI" // Example pirate voice ID
@@ -41,25 +46,54 @@ const pirateVoice = new ElevenLabs({
 
 // Add this new endpoint
 app.post('/api/generate-speech', async (req, res) => {
-    const { text, style } = req.body; // Add style parameter
-    
-    try {
-        // Use pirate voice if style is pirate, otherwise default voice
-        const voiceToUse = style === "pirate" ? pirateVoice : voice;
-        
-        const audioStream = await voiceToUse.textToSpeechStream({
-            textInput: text,
-            stability: style === "pirate" ? 0.7 : 0.5, // More stability for pirate
-            similarityBoost: style === "pirate" ? 0.8 : 0.5, // More character
-            style: style === "pirate" ? 1 : 0 // More exaggerated delivery
-        });
-        
-        res.setHeader('Content-Type', 'audio/mpeg');
-        audioStream.pipe(res);
-    } catch (error) {
-        console.error("TTS Error:", error);
-        res.status(500).json({ error: "TTS generation failed" });
-    }
+  const { text, style } = req.body;
+  
+  try {
+      // Select voice based on style
+      let voiceToUse;
+      let voiceParams = {};
+      
+      switch(style) {
+          case "pirate":
+              voiceToUse = pirateVoice;
+              voiceParams = {
+                  stability: 0.7,
+                  similarityBoost: 0.8,
+                  style: 1
+              };
+              break;
+              
+          case "italian_brainrot":
+              voiceToUse = italianBrainrot;
+              voiceParams = {
+                  stability: 0.3,  // Less stable for chaotic delivery
+                  similarityBoost: 0.7,  // Max character
+                  speed: 0.9,  // speed slower
+                  speakerBoost: true  // Extra expressiveness
+              };
+              break;
+              
+          default:
+              voiceToUse = voice;
+              voiceParams = {
+                  stability: 0.5,
+                  similarityBoost: 0.5,
+                  style: 0
+              };
+      }
+      
+      const audioStream = await voiceToUse.textToSpeechStream({
+          textInput: text,
+          ...voiceParams
+      });
+      
+      res.setHeader('Content-Type', 'audio/mpeg');
+      audioStream.pipe(res);
+      
+  } catch (error) {
+      console.error("TTS Error:", error);
+      res.status(500).json({ error: "TTS generation failed" });
+  }
 });
 
 
@@ -67,7 +101,9 @@ app.post('/api/generate-image', async (req, res) => {
     const { event, style } = req.body;
   
     try {
-        const prompt = `Historical ${style} style depiction of ${event}, simple coloring book style, line drawing`;
+        //const prompt = `Historical ${style} style depiction of ${event}`;
+
+        const prompt = `Realistic high quality photo depiction of historical event: ${event}`;
         
         // Correct DALL-E 2 parameters:
         const response = await openai.images.generate({
@@ -114,7 +150,21 @@ app.post('/api/describe-event', async (req, res) => {
                   `Example: "The revolution was that sigma glow-up moment when they ` +
                   `ate and left no crumbs - total main character energy ✨"`;
         break;
-        
+
+        case "italian_brainrot":
+          prompt += `ITALIAN BRAINROT MODE:\n` +
+                    `Generate completely unpredictable Italian nonsense that:\n` +
+                    `1. When mentioning the event, instead make up another name for it without giving an explanation (e.g. "american civil war" could transform into "guerralina civilerina americananina". be more creative. dont use quotation marks for this.)\n` +
+                    `2. Mash together food references and historical facts randomly\n` +
+                    `3. Create absurd non-sequiturs that sound like drunk folk tales\n` +
+                    `4. Use broken Italian mixed with modern slang however you want\n` +
+                    `5. Include at least one completely made-up word or phrase\n` +
+                    `6. Rhyme accidentally then abandon the rhyme scheme mid-sentence\n` +
+                    `7. Reference Italian pop culture in wrong contexts\n` +
+                    `8. End with an abrupt nonsense conclusion\n` +
+                    `NO RULES. NO PATTERNS. PURE CHAOS.`;
+          break;
+
       case "pirate":
         prompt += `PIRATE TERMS: avast, ahoy, belay, bilge rat, black spot, ` +
                   `booty, doubloons, hearties, hornswoggle, jolly roger, ` +
