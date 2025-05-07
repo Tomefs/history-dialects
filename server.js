@@ -136,7 +136,7 @@ app.post('/api/describe-event', async (req, res) => {
     let prompt = `Describe "${event}" in ${style} style. Rules:\n` +
                  `- No asterisks or quotation marks for emphasis\n` +
                  `- Use era-appropriate slang naturally\n` +
-                 `- 1 concise paragraph (1-2 sentences)\n` +
+                 `- 1 concise sentence (4-7 words)\n` +
                  `- Avoid modern terms unless style specifies\n\n` +
                  `Slang Library to Use:\n`;
   
@@ -269,6 +269,7 @@ app.post('/api/describe-event', async (req, res) => {
         const tempDir = tmpdir();
         const audioPath = path.join(tempDir, `audio-${Date.now()}.mp3`);
         const imagePath = path.join(tempDir, `image-${Date.now()}.png`);
+        const paddedImagePath = path.join(tempDir, `padded-image-${Date.now()}.png`);
         const videoPath = path.join(tempDir, `video-${Date.now()}.mp4`);
         
         await Promise.all([
@@ -276,7 +277,7 @@ app.post('/api/describe-event', async (req, res) => {
             fs.promises.writeFile(imagePath, imageBuffer)
         ]);
 
-        // 4. Get audio duration using ffprobe
+        // 4. Get audio duration
         const audioDuration = await new Promise((resolve, reject) => {
             ffmpeg.ffprobe(audioPath, (err, metadata) => {
                 if (err) reject(err);
@@ -284,58 +285,115 @@ app.post('/api/describe-event', async (req, res) => {
             });
         });
 
-        // 5. Create video with FFmpeg
+        // 5. Create padded image (9:16 aspect ratio)
         await new Promise((resolve, reject) => {
             ffmpeg()
-                // Loop the image for the duration of the audio
                 .input(imagePath)
+                .complexFilter([
+                    {
+                        filter: 'pad',
+                        options: {
+                            width: 'iw',
+                            height: 'iw*16/9',
+                            x: 0,
+                            y: '(oh-ih)/2',
+                            color: 'black'
+                        }
+                    }
+                ])
+                .output(paddedImagePath)
+                .on('end', resolve)
+                .on('error', reject)
+                .run();
+        });
+
+        // 6. Text wrapping function - UPDATED to use proper newlines
+        function wrapText(text, maxLength = 20) {
+            const words = text.split(' ');
+            let lines = [];
+            let currentLine = words[0];
+            
+            for (let i = 1; i < words.length; i++) {
+                if ((currentLine + ' ' + words[i]).length <= maxLength) {
+                    currentLine += ' ' + words[i];
+                } else {
+                    lines.push(currentLine);
+                    currentLine = words[i];
+                }
+            }
+            lines.push(currentLine);
+            return lines.join('\n'); // SINGLE backslash n for FFmpeg
+        }
+
+        const wrappedText = wrapText(text);
+
+        // 7. Create video with proper text formatting
+        await new Promise((resolve, reject) => {
+            // Escape single quotes and special characters for FFmpeg
+            const escapedText = wrappedText.replace(/'/g, "'\\''")
+                                          .replace(/:/g, '\\:')
+                                          .replace(/,/g, '\\,');
+
+            ffmpeg()
+                .input(paddedImagePath)
                 .inputOptions([
                     '-loop 1',
                     `-t ${audioDuration}`
                 ])
-                // Add the audio
                 .input(audioPath)
+                .videoCodec('libx264')
+                .audioCodec('aac')
                 .outputOptions([
-                    '-c:v libx264',
-                    '-tune stillimage',
-                    '-c:a aac',
-                    '-b:a 192k',
+                    '-vf',
+                    `scale=256:456,` +
+                    `drawtext=text='${escapedText}':` +
+                    `fontcolor=white:` +
+                    `fontsize=24:` +
+                    `x=(w-text_w)/2:` +
+                    `y=h-line_h-100:` +
+                    `shadowcolor=black:` +
+                    `shadowx=2:` +
+                    `shadowy=2:` +
+                    `box=1:` +
+                    `boxcolor=black@0.5:` +
+                    `boxborderw=5`,
                     '-pix_fmt yuv420p',
                     '-shortest',
-                    // Set the video to match audio duration
-                    `-t ${audioDuration}`
+                    '-movflags +faststart',
+                    '-r 30'
                 ])
+                .duration(audioDuration)
                 .output(videoPath)
-                .on('end', () => {
-                    console.log(`Video generation completed. Duration: ${audioDuration}s`);
-                    resolve();
-                })
-                .on('error', (err) => {
+                .on('end', resolve)
+                .on('error', (err, stdout, stderr) => {
                     console.error('FFmpeg error:', err);
+                    console.error('FFmpeg stdout:', stdout);
+                    console.error('FFmpeg stderr:', stderr);
                     reject(err);
                 })
                 .run();
         });
         
-        // 6. Read the video file and send it
+        // 8. Read and send video
         const videoBuffer = await fs.promises.readFile(videoPath);
         
-        // 7. Clean up temp files
+        // 9. Clean up
         await Promise.all([
-            fs.promises.unlink(audioPath).catch(console.error),
-            fs.promises.unlink(imagePath).catch(console.error),
-            fs.promises.unlink(videoPath).catch(console.error)
-        ]);
+            fs.promises.unlink(audioPath),
+            fs.promises.unlink(imagePath),
+            fs.promises.unlink(paddedImagePath),
+            fs.promises.unlink(videoPath)
+        ].map(p => p.catch(console.error)));
         
-        // 8. Send the video
         res.setHeader('Content-Type', 'video/mp4');
         res.send(videoBuffer);
         
     } catch (error) {
         console.error("Video generation error:", error);
         res.status(500).json({ 
-            error: "Video generation failed",
-            details: error.message 
+            error: "Video generation failed", 
+            details: error.message,
+            ffmpegCommand: error.command
         });
     }
 });
