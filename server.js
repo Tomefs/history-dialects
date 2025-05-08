@@ -49,6 +49,13 @@ app.post('/api/generate-speech', async (req, res) => {
   const { text, style } = req.body;
   
   try {
+      // Pre-process text to remove unwanted characters
+      const cleanText = text
+    .replace(/[*]/g, '')      // Remove asterisks (more explicit regex)
+    .replace(/_/g, ' ')       // Replace underscores with spaces
+    .replace(/#/g, '')        // Remove hash symbols
+    .replace(/\[.*?\]/g, ''); // Remove any text in brackets
+      
       // Select voice based on style
       let voiceToUse;
       let voiceParams = {};
@@ -86,7 +93,7 @@ app.post('/api/generate-speech', async (req, res) => {
       const response = await axios.post(
           `https://api.elevenlabs.io/v1/text-to-speech/${voiceToUse.voiceId}/with-timestamps`,
           {
-              text: text,
+              text: cleanText,  // Use the cleaned text here
               model_id: "eleven_monolingual_v1",
               voice_settings: voiceParams
           },
@@ -162,9 +169,12 @@ app.post('/api/describe-event', async (req, res) => {
   
     // Base rules for ALL styles
     let prompt = `Describe "${event}" in ${style} style. Rules:\n` +
-                 `- No asterisks or quotation marks for emphasis\n` +
+                 `- No asterisks or dashes (-)\n` +
+                 `- Don't use quotation marks\n` +
+                 `- Don't use asterisks\n` +
                  `- Use era-appropriate slang naturally\n` +
-                 `- 1 concise sentence (2-5 words)\n` +
+                 `- 1 concise paragraph (4-6 sentences)\n` +
+                 /*`- 1 concise sentence (1-3 words)\n` +*/
                  `- Avoid modern terms unless style specifies\n\n` +
                  `Slang Library to Use:\n`;
   
@@ -222,7 +232,9 @@ app.post('/api/describe-event', async (req, res) => {
       case "valley_girl":
         prompt += `VALLEY SLANG: like, totally, fer sure, whatever, ` +
                   `as if, gag me, grody, hella, tubular, bitchin', ` +
-                  `psyche, barf out, mall rat, valley girl inflection (upspeak)\n` +
+                  `psyche, barf out, mall rat.\n` +
+                  `use valley girl inflection (upspeak).\n` +
+                  `do not use asterisks.\n` +
                   `Example: "So like, the king was all 'I rule everything' ` +
                   `and the people were like, AS IF, and then totally ` +
                   `yeeted him out?"`;
@@ -274,184 +286,286 @@ app.post('/api/describe-event', async (req, res) => {
   });
 
 
+
+
+
+
   app.post('/api/generate-video', async (req, res) => {
-        const { imageUrl, text, style } = req.body;
-        
-        try {
-            // 1. Get the audio stream WITH TIMESTAMPS
-            const audioResponse = await axios.post(
-                `https://api.elevenlabs.io/v1/text-to-speech/${style === 'pirate' ? pirateVoice.voiceId : 
-                  style === 'italian_brainrot' ? italianBrainrot.voiceId : voice.voiceId}/with-timestamps`,
-                {
-                    text: text,
-                    model_id: "eleven_monolingual_v1",
-                    voice_settings: {
-                        stability: style === 'italian_brainrot' ? 0.3 : 0.5,
-                        similarity_boost: style === 'italian_brainrot' ? 0.7 : 0.5
-                    }
+    const { imageUrl, text, style } = req.body;
+    
+    try {
+        // 1. Get the audio stream WITH TIMESTAMPS
+        const audioResponse = await axios.post(
+            `https://api.elevenlabs.io/v1/text-to-speech/${style === 'pirate' ? pirateVoice.voiceId : 
+              style === 'italian_brainrot' ? italianBrainrot.voiceId : voice.voiceId}/with-timestamps`,
+            {
+                text: text,
+                model_id: "eleven_monolingual_v1",
+                voice_settings: {
+                    stability: style === 'italian_brainrot' ? 0.3 : 0.5,
+                    similarity_boost: style === 'italian_brainrot' ? 0.7 : 0.5
+                }
+            },
+            {
+                headers: {
+                    'xi-api-key': process.env.ELEVENLABS_API_KEY,
+                    'Content-Type': 'application/json'
                 },
-                {
-                    headers: {
-                        'xi-api-key': process.env.ELEVENLABS_API_KEY,
-                        'Content-Type': 'application/json'
-                    },
-                    responseType: 'json'
+                responseType: 'json'
+            }
+        );
+
+        const audioBuffer = Buffer.from(audioResponse.data.audio_base64, 'base64');
+        const alignment = audioResponse.data.alignment;
+
+        // 2. Precise timestamp-based phrase splitting
+        const phrases = [];
+        let currentPhrase = {
+            text: '',
+            words: [],
+            start: null,
+            end: 0
+        };
+
+        // Track current word with precise timings
+        let currentWord = {
+            text: '',
+            start: null,
+            end: 0,
+            chars: []
+        };
+
+        alignment.characters.forEach((char, index) => {
+            const charStart = alignment.character_start_times_seconds[index];
+            const charEnd = alignment.character_end_times_seconds[index];
+
+            // Build current word
+            if (char !== ' ' && char !== ',' && char !== '.' && char !== '!' && char !== '?') {
+                if (currentWord.text === '') {
+                    currentWord.start = charStart;
                 }
-            );
-
-            const audioBuffer = Buffer.from(audioResponse.data.audio_base64, 'base64');
-            const alignment = audioResponse.data.alignment;
-
-            // 2. Group characters into words with timestamps
-            const words = [];
-            let currentWord = '';
-            let wordStart = 0;
-            let wordEnd = 0;
-
-            alignment.characters.forEach((char, index) => {
-                if (char === ' ' || char === '.' || char === ',' || char === '!' || char === '?') {
-                    if (currentWord) {
-                        words.push({
-                            text: currentWord,
-                            start: wordStart,
-                            end: wordEnd
-                        });
-                        currentWord = '';
-                    }
-                } else {
-                    if (currentWord === '') {
-                        wordStart = alignment.character_start_times_seconds[index];
-                    }
-                    currentWord += char;
-                    wordEnd = alignment.character_end_times_seconds[index];
-                }
-            });
-
-            // Add the last word if exists
-            if (currentWord) {
-                words.push({
-                    text: currentWord,
-                    start: wordStart,
-                    end: wordEnd
-                });
+                currentWord.text += char;
+                currentWord.end = charEnd;
+                currentWord.chars.push({ char, start: charStart, end: charEnd });
+                return;
             }
 
-            console.log("Word timestamps:", words);
+            // Finalize current word if exists
+            if (currentWord.text) {
+                currentPhrase.words.push({
+                    text: currentWord.text,
+                    start: currentWord.start,
+                    end: currentWord.end
+                });
+                
+                if (currentPhrase.start === null) {
+                    currentPhrase.start = currentWord.start;
+                }
+                currentPhrase.end = currentWord.end;
+                
+                currentWord = { text: '', start: null, end: 0, chars: [] };
+            }
 
-            // 3. Download the image
-            const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-            const imageBuffer = Buffer.from(imageResponse.data, 'binary');
-            
-            // 4. Create temp files
-            const tempDir = tmpdir();
-            const audioPath = path.join(tempDir, `audio-${Date.now()}.mp3`);
-            const imagePath = path.join(tempDir, `image-${Date.now()}.png`);
-            const paddedImagePath = path.join(tempDir, `padded-image-${Date.now()}.png`);
-            const videoPath = path.join(tempDir, `video-${Date.now()}.mp4`);
-            
-            await Promise.all([
-                fs.promises.writeFile(audioPath, audioBuffer),
-                fs.promises.writeFile(imagePath, imageBuffer)
-            ]);
+            // Finalize phrase at sentence boundaries
+            if (char === '.' || char === '!' || char === '?') {
+                if (currentPhrase.words.length > 0) {
+                    currentPhrase.text = currentPhrase.words.map(w => w.text).join(' ');
+                    phrases.push({ ...currentPhrase });
+                    currentPhrase = { text: '', words: [], start: null, end: 0 };
+                }
+            }
+        });
 
-            // 5. Create padded image (9:16 aspect ratio)
-            await new Promise((resolve, reject) => {
-                ffmpeg()
-                    .input(imagePath)
-                    .complexFilter([
-                        {
-                            filter: 'pad',
-                            options: {
-                                width: 'iw',
-                                height: 'iw*16/9',
-                                x: 0,
-                                y: '(oh-ih)/2',
-                                color: 'black'
-                            }
-                        }
-                    ])
-                    .output(paddedImagePath)
-                    .on('end', resolve)
-                    .on('error', reject)
-                    .run();
+        // Handle final word/phrase if exists
+        if (currentWord.text) {
+            currentPhrase.words.push({
+                text: currentWord.text,
+                start: currentWord.start,
+                end: currentWord.end
             });
-
-            // 6. Generate FFmpeg filter for word-by-word display
-            let drawtextFilters = `scale=256:456`;
-            let yPosition = 'h-line_h-100'; // Adjust as needed
-
-            words.forEach((word, index) => {
-                const escapedText = word.text.replace(/'/g, "'\\''")
-                                          .replace(/:/g, '\\:')
-                                          .replace(/,/g, '\\,');
-
-                drawtextFilters += `,` +
-                    `drawtext=text='${escapedText}':` +
-                    `fontcolor=white:` +
-                    `fontsize=24:` +
-                    `x=(w-text_w)/2:` +
-                    `y=${yPosition}:` +
-                    `shadowcolor=black:` +
-                    `shadowx=2:` +
-                    `shadowy=2:` +
-                    `box=1:` +
-                    `boxcolor=black@0.5:` +
-                    `boxborderw=5:` +
-                    `enable='between(t,${word.start},${word.end})'`;
-            });
-
-            // 7. Create video with word-by-word display
-            await new Promise((resolve, reject) => {
-              const totalDuration = words[words.length - 1].end; // Get end time of last word
-              
-              ffmpeg()
-                  .input(paddedImagePath)
-                  .inputOptions([
-                      '-loop 1', // Loop the image input
-                      `-t ${totalDuration}` // Set duration to match audio
-                  ])
-                  .input(audioPath)
-                  .videoCodec('libx264')
-                  .audioCodec('aac')
-                  .outputOptions([
-                      '-vf',
-                      drawtextFilters,
-                      '-pix_fmt yuv420p',
-                      '-shortest', // Finish when audio ends
-                      '-movflags +faststart',
-                      '-r 30'
-                  ])
-                  .output(videoPath)
-                  .on('end', () => {
-                      console.log(`Video generated with duration: ${totalDuration}s`);
-                      resolve();
-                  })
-                  .on('error', reject)
-                  .run();
-          });
-            
-            // 8. Read and send video
-            const videoBuffer = await fs.promises.readFile(videoPath);
-            
-            // 9. Clean up
-            await Promise.all([
-                fs.promises.unlink(audioPath),
-                fs.promises.unlink(imagePath),
-                fs.promises.unlink(paddedImagePath),
-                fs.promises.unlink(videoPath)
-            ].map(p => p.catch(console.error)));
-            
-            res.setHeader('Content-Type', 'video/mp4');
-            res.send(videoBuffer);
-            
-        } catch (error) {
-            console.error("Video generation error:", error);
-            res.status(500).json({ 
-                error: "Video generation failed", 
-                details: error.message
-            });
+            if (currentPhrase.start === null) {
+                currentPhrase.start = currentWord.start;
+            }
+            currentPhrase.end = currentWord.end;
         }
-    });
+        if (currentPhrase.words.length > 0) {
+            currentPhrase.text = currentPhrase.words.map(w => w.text).join(' ');
+            phrases.push({ ...currentPhrase });
+        }
+
+        // Now split long phrases while preserving original timestamps
+        const finalPhrases = [];
+        phrases.forEach(phrase => {
+          // Calculate average word length in this phrase
+          const avgWordLength = phrase.words.reduce((sum, word) => sum + word.text.length, 0) / phrase.words.length;
+          
+          // Determine max words based on average length
+          let maxWords;
+          if (avgWordLength > 5) {
+              maxWords = 3; // Very long words - max 3 words per segment
+          } else if (avgWordLength > 2) {
+              maxWords = 4; // Medium-long words - max 4 words
+          } else {
+              maxWords = 5; // Short words - up to 5 words
+          }
+      
+          // If phrase is short enough, keep as-is
+          if (phrase.words.length <= maxWords) {
+              finalPhrases.push(phrase);
+              return;
+          }
+      
+          // Split long phrases using original word timestamps
+          let currentSegment = {
+              text: '',
+              words: [],
+              start: phrase.words[0].start,
+              end: phrase.words[0].end
+          };
+      
+          phrase.words.forEach((word, i) => {
+              // Start new segment if current one would exceed max words
+              if (currentSegment.words.length >= maxWords) {
+                  currentSegment.text = currentSegment.words.map(w => w.text).join(' ');
+                  finalPhrases.push({ ...currentSegment });
+                  
+                  currentSegment = {
+                      text: '',
+                      words: [],
+                      start: word.start,
+                      end: word.end
+                  };
+              }
+      
+              currentSegment.words.push(word);
+              currentSegment.end = word.end;
+          });
+      
+          // Add final segment
+          if (currentSegment.words.length > 0) {
+              currentSegment.text = currentSegment.words.map(w => w.text).join(' ');
+              finalPhrases.push({ ...currentSegment });
+          }
+      });
+
+        console.log("Final phrases with precise timings:", finalPhrases);
+        const totalDuration = finalPhrases[finalPhrases.length - 1].end;
+
+        // 3. Download the image
+        const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+        const imageBuffer = Buffer.from(imageResponse.data, 'binary');
+        
+        // 4. Create temp files
+        const tempDir = tmpdir();
+        const audioPath = path.join(tempDir, `audio-${Date.now()}.mp3`);
+        const imagePath = path.join(tempDir, `image-${Date.now()}.png`);
+        const paddedImagePath = path.join(tempDir, `padded-image-${Date.now()}.png`);
+        const videoPath = path.join(tempDir, `video-${Date.now()}.mp4`);
+        
+        await Promise.all([
+            fs.promises.writeFile(audioPath, audioBuffer),
+            fs.promises.writeFile(imagePath, imageBuffer)
+        ]);
+
+        // 5. Create padded image (9:16 aspect ratio)
+        await new Promise((resolve, reject) => {
+            ffmpeg()
+                .input(imagePath)
+                .complexFilter([
+                    {
+                        filter: 'pad',
+                        options: {
+                            width: 'iw',
+                            height: 'iw*16/9',
+                            x: 0,
+                            y: '(oh-ih)/2',
+                            color: 'black'
+                        }
+                    }
+                ])
+                .output(paddedImagePath)
+                .on('end', resolve)
+                .on('error', reject)
+                .run();
+        });
+
+        // 6. Generate FFmpeg filter for phrase display
+        let filterChain = [];
+        finalPhrases.forEach((phrase, i) => {
+            const escapedText = phrase.text.replace(/'/g, "'\\''")
+                                         .replace(/:/g, '\\:')
+                                         .replace(/,/g, '\\,');
+            
+            filterChain.push(
+                `drawtext=fontfile=roboto.ttf:` +
+                `text='${escapedText}':` +
+                `fontcolor=white:` +
+                `fontsize=20:` +
+                `x=(w-text_w)/2:` +
+                `y=h-line_h-50:` +
+                `bordercolor=black:` +
+                `borderw=1:` +
+                `shadowcolor=black:` +
+                `shadowx=1:` +
+                `shadowy=1:` +
+                `enable='between(t,${phrase.start},${phrase.end})'`
+            );
+        });
+
+        const drawtextFilters = `scale=256:456,${filterChain.join(',')}`;
+
+        // 7. Create video with phrase-by-phrase display
+        await new Promise((resolve, reject) => {
+            ffmpeg()
+                .input(paddedImagePath)
+                .inputOptions([
+                    '-loop 1',
+                    `-t ${totalDuration}`
+                ])
+                .input(audioPath)
+                .videoCodec('libx264')
+                .audioCodec('aac')
+                .outputOptions([
+                    '-vf',
+                    drawtextFilters,
+                    '-pix_fmt yuv420p',
+                    '-shortest',
+                    '-movflags +faststart',
+                    '-r 30'
+                ])
+                .output(videoPath)
+                .on('end', () => {
+                    console.log(`Video generated with duration: ${totalDuration}s`);
+                    console.log('Phrase display sequence:');
+                    finalPhrases.forEach(p => console.log(`[${p.start.toFixed(2)}s-${p.end.toFixed(2)}s]: ${p.text}`));
+                    resolve();
+                })
+                .on('error', reject)
+                .run();
+        });
+        
+        // 8. Read and send video
+        const videoBuffer = await fs.promises.readFile(videoPath);
+        
+        // 9. Clean up
+        await Promise.all([
+            fs.promises.unlink(audioPath),
+            fs.promises.unlink(imagePath),
+            fs.promises.unlink(paddedImagePath),
+            fs.promises.unlink(videoPath)
+        ].map(p => p.catch(console.error)));
+        
+        res.setHeader('Content-Type', 'video/mp4');
+        res.send(videoBuffer);
+        
+    } catch (error) {
+        console.error("Video generation error:", error);
+        res.status(500).json({ 
+            error: "Video generation failed", 
+            details: error.message
+        });
+    }
+});
 
 
 
