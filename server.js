@@ -66,10 +66,10 @@ app.post('/api/generate-speech', async (req, res) => {
           case "italian_brainrot":
               voiceToUse = italianBrainrot;
               voiceParams = {
-                  stability: 0.3,  // Less stable for chaotic delivery
-                  similarityBoost: 0.7,  // Max character
-                  speed: 0.9,  // speed slower
-                  speakerBoost: true  // Extra expressiveness
+                  stability: 0.3,
+                  similarityBoost: 0.7,
+                  speed: 0.9,
+                  speakerBoost: true
               };
               break;
               
@@ -81,17 +81,45 @@ app.post('/api/generate-speech', async (req, res) => {
                   style: 0
               };
       }
-      
-      const audioStream = await voiceToUse.textToSpeechStream({
-          textInput: text,
-          ...voiceParams
-      });
+
+      // Make API call to ElevenLabs with timestamps
+      const response = await axios.post(
+          `https://api.elevenlabs.io/v1/text-to-speech/${voiceToUse.voiceId}/with-timestamps`,
+          {
+              text: text,
+              model_id: "eleven_monolingual_v1",
+              voice_settings: voiceParams
+          },
+          {
+              headers: {
+                  'xi-api-key': process.env.ELEVENLABS_API_KEY,
+                  'Content-Type': 'application/json'
+              },
+              responseType: 'json'
+          }
+      );
+
+      // Print the timestamps to console
+      console.log("Received timestamps from ElevenLabs:");
+      console.log("Raw alignment data:", response.data.alignment);
+      console.log("Raw normalized alignment data:", response.data.normalized_alignment);
+
+      // Format and print character-level timestamps
+      if (response.data.alignment) {
+          console.log("\nCharacter-level timestamps:");
+          response.data.alignment.characters.forEach((char, index) => {
+              console.log(`Character: '${char}' | Start: ${response.data.alignment.character_start_times_seconds[index]}s | End: ${response.data.alignment.character_end_times_seconds[index]}s`);
+          });
+      }
+
+      // Convert base64 audio to buffer and stream it
+      const audioBuffer = Buffer.from(response.data.audio_base64, 'base64');
       
       res.setHeader('Content-Type', 'audio/mpeg');
-      audioStream.pipe(res);
+      res.send(audioBuffer);
       
   } catch (error) {
-      console.error("TTS Error:", error);
+      console.error("TTS Error:", error.response?.data || error.message);
       res.status(500).json({ error: "TTS generation failed" });
   }
 });
@@ -136,7 +164,7 @@ app.post('/api/describe-event', async (req, res) => {
     let prompt = `Describe "${event}" in ${style} style. Rules:\n` +
                  `- No asterisks or quotation marks for emphasis\n` +
                  `- Use era-appropriate slang naturally\n` +
-                 `- 1 concise sentence (4-7 words)\n` +
+                 `- 1 concise sentence (2-5 words)\n` +
                  `- Avoid modern terms unless style specifies\n\n` +
                  `Slang Library to Use:\n`;
   
@@ -247,156 +275,183 @@ app.post('/api/describe-event', async (req, res) => {
 
 
   app.post('/api/generate-video', async (req, res) => {
-    const { imageUrl, text, style } = req.body;
-    
-    try {
-        // 1. Get the audio stream
-        const audioResponse = await fetch('http://localhost:3000/api/generate-speech', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, style })
-        });
+        const { imageUrl, text, style } = req.body;
         
-        if (!audioResponse.ok) throw new Error('Failed to generate audio');
-        const audioArrayBuffer = await audioResponse.arrayBuffer();
-        const audioBuffer = Buffer.from(audioArrayBuffer);
-
-        // 2. Download the image
-        const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-        const imageBuffer = Buffer.from(imageResponse.data, 'binary');
-        
-        // 3. Create temp files
-        const tempDir = tmpdir();
-        const audioPath = path.join(tempDir, `audio-${Date.now()}.mp3`);
-        const imagePath = path.join(tempDir, `image-${Date.now()}.png`);
-        const paddedImagePath = path.join(tempDir, `padded-image-${Date.now()}.png`);
-        const videoPath = path.join(tempDir, `video-${Date.now()}.mp4`);
-        
-        await Promise.all([
-            fs.promises.writeFile(audioPath, audioBuffer),
-            fs.promises.writeFile(imagePath, imageBuffer)
-        ]);
-
-        // 4. Get audio duration
-        const audioDuration = await new Promise((resolve, reject) => {
-            ffmpeg.ffprobe(audioPath, (err, metadata) => {
-                if (err) reject(err);
-                resolve(metadata.format.duration);
-            });
-        });
-
-        // 5. Create padded image (9:16 aspect ratio)
-        await new Promise((resolve, reject) => {
-            ffmpeg()
-                .input(imagePath)
-                .complexFilter([
-                    {
-                        filter: 'pad',
-                        options: {
-                            width: 'iw',
-                            height: 'iw*16/9',
-                            x: 0,
-                            y: '(oh-ih)/2',
-                            color: 'black'
-                        }
+        try {
+            // 1. Get the audio stream WITH TIMESTAMPS
+            const audioResponse = await axios.post(
+                `https://api.elevenlabs.io/v1/text-to-speech/${style === 'pirate' ? pirateVoice.voiceId : 
+                  style === 'italian_brainrot' ? italianBrainrot.voiceId : voice.voiceId}/with-timestamps`,
+                {
+                    text: text,
+                    model_id: "eleven_monolingual_v1",
+                    voice_settings: {
+                        stability: style === 'italian_brainrot' ? 0.3 : 0.5,
+                        similarity_boost: style === 'italian_brainrot' ? 0.7 : 0.5
                     }
-                ])
-                .output(paddedImagePath)
-                .on('end', resolve)
-                .on('error', reject)
-                .run();
-        });
-
-        // 6. Text wrapping function - UPDATED to use proper newlines
-        function wrapText(text, maxLength = 20) {
-            const words = text.split(' ');
-            let lines = [];
-            let currentLine = words[0];
-            
-            for (let i = 1; i < words.length; i++) {
-                if ((currentLine + ' ' + words[i]).length <= maxLength) {
-                    currentLine += ' ' + words[i];
-                } else {
-                    lines.push(currentLine);
-                    currentLine = words[i];
+                },
+                {
+                    headers: {
+                        'xi-api-key': process.env.ELEVENLABS_API_KEY,
+                        'Content-Type': 'application/json'
+                    },
+                    responseType: 'json'
                 }
+            );
+
+            const audioBuffer = Buffer.from(audioResponse.data.audio_base64, 'base64');
+            const alignment = audioResponse.data.alignment;
+
+            // 2. Group characters into words with timestamps
+            const words = [];
+            let currentWord = '';
+            let wordStart = 0;
+            let wordEnd = 0;
+
+            alignment.characters.forEach((char, index) => {
+                if (char === ' ' || char === '.' || char === ',' || char === '!' || char === '?') {
+                    if (currentWord) {
+                        words.push({
+                            text: currentWord,
+                            start: wordStart,
+                            end: wordEnd
+                        });
+                        currentWord = '';
+                    }
+                } else {
+                    if (currentWord === '') {
+                        wordStart = alignment.character_start_times_seconds[index];
+                    }
+                    currentWord += char;
+                    wordEnd = alignment.character_end_times_seconds[index];
+                }
+            });
+
+            // Add the last word if exists
+            if (currentWord) {
+                words.push({
+                    text: currentWord,
+                    start: wordStart,
+                    end: wordEnd
+                });
             }
-            lines.push(currentLine);
-            return lines.join('\n'); // SINGLE backslash n for FFmpeg
-        }
 
-        const wrappedText = wrapText(text);
+            console.log("Word timestamps:", words);
 
-        // 7. Create video with proper text formatting
-        await new Promise((resolve, reject) => {
-            // Escape single quotes and special characters for FFmpeg
-            const escapedText = wrappedText.replace(/'/g, "'\\''")
+            // 3. Download the image
+            const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+            const imageBuffer = Buffer.from(imageResponse.data, 'binary');
+            
+            // 4. Create temp files
+            const tempDir = tmpdir();
+            const audioPath = path.join(tempDir, `audio-${Date.now()}.mp3`);
+            const imagePath = path.join(tempDir, `image-${Date.now()}.png`);
+            const paddedImagePath = path.join(tempDir, `padded-image-${Date.now()}.png`);
+            const videoPath = path.join(tempDir, `video-${Date.now()}.mp4`);
+            
+            await Promise.all([
+                fs.promises.writeFile(audioPath, audioBuffer),
+                fs.promises.writeFile(imagePath, imageBuffer)
+            ]);
+
+            // 5. Create padded image (9:16 aspect ratio)
+            await new Promise((resolve, reject) => {
+                ffmpeg()
+                    .input(imagePath)
+                    .complexFilter([
+                        {
+                            filter: 'pad',
+                            options: {
+                                width: 'iw',
+                                height: 'iw*16/9',
+                                x: 0,
+                                y: '(oh-ih)/2',
+                                color: 'black'
+                            }
+                        }
+                    ])
+                    .output(paddedImagePath)
+                    .on('end', resolve)
+                    .on('error', reject)
+                    .run();
+            });
+
+            // 6. Generate FFmpeg filter for word-by-word display
+            let drawtextFilters = `scale=256:456`;
+            let yPosition = 'h-line_h-100'; // Adjust as needed
+
+            words.forEach((word, index) => {
+                const escapedText = word.text.replace(/'/g, "'\\''")
                                           .replace(/:/g, '\\:')
                                           .replace(/,/g, '\\,');
 
-            ffmpeg()
-                .input(paddedImagePath)
-                .inputOptions([
-                    '-loop 1',
-                    `-t ${audioDuration}`
-                ])
-                .input(audioPath)
-                .videoCodec('libx264')
-                .audioCodec('aac')
-                .outputOptions([
-                    '-vf',
-                    `scale=256:456,` +
+                drawtextFilters += `,` +
                     `drawtext=text='${escapedText}':` +
                     `fontcolor=white:` +
                     `fontsize=24:` +
                     `x=(w-text_w)/2:` +
-                    `y=h-line_h-100:` +
+                    `y=${yPosition}:` +
                     `shadowcolor=black:` +
                     `shadowx=2:` +
                     `shadowy=2:` +
                     `box=1:` +
                     `boxcolor=black@0.5:` +
-                    `boxborderw=5`,
-                    '-pix_fmt yuv420p',
-                    '-shortest',
-                    '-movflags +faststart',
-                    '-r 30'
-                ])
-                .duration(audioDuration)
-                .output(videoPath)
-                .on('end', resolve)
-                .on('error', (err, stdout, stderr) => {
-                    console.error('FFmpeg error:', err);
-                    console.error('FFmpeg stdout:', stdout);
-                    console.error('FFmpeg stderr:', stderr);
-                    reject(err);
-                })
-                .run();
-        });
-        
-        // 8. Read and send video
-        const videoBuffer = await fs.promises.readFile(videoPath);
-        
-        // 9. Clean up
-        await Promise.all([
-            fs.promises.unlink(audioPath),
-            fs.promises.unlink(imagePath),
-            fs.promises.unlink(paddedImagePath),
-            fs.promises.unlink(videoPath)
-        ].map(p => p.catch(console.error)));
-        
-        res.setHeader('Content-Type', 'video/mp4');
-        res.send(videoBuffer);
-        
-    } catch (error) {
-        console.error("Video generation error:", error);
-        res.status(500).json({ 
-            error: "Video generation failed", 
-            details: error.message,
-            ffmpegCommand: error.command
-        });
-    }
-});
+                    `boxborderw=5:` +
+                    `enable='between(t,${word.start},${word.end})'`;
+            });
+
+            // 7. Create video with word-by-word display
+            await new Promise((resolve, reject) => {
+              const totalDuration = words[words.length - 1].end; // Get end time of last word
+              
+              ffmpeg()
+                  .input(paddedImagePath)
+                  .inputOptions([
+                      '-loop 1', // Loop the image input
+                      `-t ${totalDuration}` // Set duration to match audio
+                  ])
+                  .input(audioPath)
+                  .videoCodec('libx264')
+                  .audioCodec('aac')
+                  .outputOptions([
+                      '-vf',
+                      drawtextFilters,
+                      '-pix_fmt yuv420p',
+                      '-shortest', // Finish when audio ends
+                      '-movflags +faststart',
+                      '-r 30'
+                  ])
+                  .output(videoPath)
+                  .on('end', () => {
+                      console.log(`Video generated with duration: ${totalDuration}s`);
+                      resolve();
+                  })
+                  .on('error', reject)
+                  .run();
+          });
+            
+            // 8. Read and send video
+            const videoBuffer = await fs.promises.readFile(videoPath);
+            
+            // 9. Clean up
+            await Promise.all([
+                fs.promises.unlink(audioPath),
+                fs.promises.unlink(imagePath),
+                fs.promises.unlink(paddedImagePath),
+                fs.promises.unlink(videoPath)
+            ].map(p => p.catch(console.error)));
+            
+            res.setHeader('Content-Type', 'video/mp4');
+            res.send(videoBuffer);
+            
+        } catch (error) {
+            console.error("Video generation error:", error);
+            res.status(500).json({ 
+                error: "Video generation failed", 
+                details: error.message
+            });
+        }
+    });
 
 
 
