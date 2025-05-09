@@ -173,8 +173,8 @@ app.post('/api/describe-event', async (req, res) => {
                  `- Don't use quotation marks\n` +
                  `- Don't use asterisks\n` +
                  `- Use era-appropriate slang naturally\n` +
-                 `- 1 concise paragraph (4-6 sentences)\n` +
-                 /*`- 1 concise sentence (1-3 words)\n` +*/
+                 /*`- 1 concise paragraph (4-6 sentences)\n` +*/
+                 `- 1 concise sentence (1-3 words)\n` +
                  `- Avoid modern terms unless style specifies\n\n` +
                  `Slang Library to Use:\n`;
   
@@ -489,30 +489,50 @@ app.post('/api/describe-event', async (req, res) => {
                 .run();
         });
 
-        // 6. Generate FFmpeg filter for phrase display
-        let filterChain = [];
-        finalPhrases.forEach((phrase, i) => {
-            const escapedText = phrase.text.replace(/'/g, "'\\''")
-                                         .replace(/:/g, '\\:')
-                                         .replace(/,/g, '\\,');
-            
-            filterChain.push(
-                `drawtext=fontfile=roboto.ttf:` +
-                `text='${escapedText}':` +
-                `fontcolor=white:` +
-                `fontsize=20:` +
-                `x=(w-text_w)/2:` +
-                `y=h-line_h-50:` +
-                `bordercolor=black:` +
-                `borderw=1:` +
-                `shadowcolor=black:` +
-                `shadowx=1:` +
-                `shadowy=1:` +
-                `enable='between(t,${phrase.start},${phrase.end})'`
-            );
-        });
+       // 6. Generate FFmpeg filter with exact letter positioning
+let filterChain = [];
+finalPhrases.forEach((phrase, i) => {
+    const charWidth = 12;
+    const spaceWidth = 5;
+    let currentXPosition = 0;
 
-        const drawtextFilters = `scale=256:456,${filterChain.join(',')}`;
+    // Draw each character but make them all appear at phrase.start simultaneously
+    for (let j = 0; j < phrase.text.length; j++) {
+        const letter = phrase.text[j];
+        const escapedLetter = letter.replace(/'/g, "'\\''")
+                                  .replace(/:/g, '\\:')
+                                  .replace(/,/g, '\\,');
+        const width = (letter === ' ') ? spaceWidth : charWidth;
+
+        filterChain.push(
+            `drawtext=fontfile=rubik.ttf:` +
+            `text='${escapedLetter}':` +
+            `fontcolor=white:` +
+            `fontsize=14:` +
+            `x=(w-${getTotalTextWidth(phrase.text, charWidth, spaceWidth)})/2+${currentXPosition}:` +
+            `y=h-line_h-50:` +
+            `bordercolor=black:` +
+            `borderw=1:` +
+            `shadowcolor=black:` +
+            `shadowx=1:` +
+            `shadowy=1:` +
+            // KEY CHANGE: All characters appear at phrase.start simultaneously
+            `enable='between(t,${phrase.start},${phrase.end})'`
+        );
+
+        currentXPosition += width;
+    }
+});
+
+function getTotalTextWidth(text, charWidth, spaceWidth) {
+    let total = 0;
+    for (let i = 0; i < text.length; i++) {
+        total += (text[i] === ' ') ? spaceWidth : charWidth;
+    }
+    return total;
+}
+
+const drawtextFilters = `scale=256:456,${filterChain.join(',')}`;
 
         // 7. Create video with phrase-by-phrase display
         await new Promise((resolve, reject) => {
