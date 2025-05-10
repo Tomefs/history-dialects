@@ -37,19 +37,61 @@ const voice = new ElevenLabs({
     voiceId: "EXAVITQu4vr4xnSDxMaL" // Default voice ID
 });
 
-const italianBrainrot = new ElevenLabs({
-  apiKey: process.env.ELEVENLABS_API_KEY,
-  voiceId: "pNInz6obpgDQGcFmaJgB" 
+const brainrotVoice = new ElevenLabs({
+    apiKey: process.env.ELEVENLABS_API_KEY,
+    voiceId: "CwhRBWXzGAHq8TQ4Fs17"
+});
+
+const italianBrainrotVoice = new ElevenLabs({
+    apiKey: process.env.ELEVENLABS_API_KEY,
+    voiceId: "pNInz6obpgDQGcFmaJgB" 
 });
 
 const pirateVoice = new ElevenLabs({
     apiKey: process.env.ELEVENLABS_API_KEY,
-    voiceId: "PPzYpIqttlTYA83688JI" // Example pirate voice ID
+    voiceId: "PPzYpIqttlTYA83688JI"
+});
+
+const shakespeareVoice = new ElevenLabs({
+    apiKey: process.env.ELEVENLABS_API_KEY,
+    voiceId: "qg9068uIPhh2zLXgBEgX"
+});
+
+const africanAmericanVoice = new ElevenLabs({
+    apiKey: process.env.ELEVENLABS_API_KEY,
+    voiceId: "6OzrBCQf8cjERkYgzSg8"
+});
+
+const storytellerVoice = new ElevenLabs({
+    apiKey: process.env.ELEVENLABS_API_KEY,
+    voiceId: "dPah2VEoifKnZT37774q"
 });
 
 
 function getVoiceSettings(style) {
     switch(style) {
+        case "brainrot":
+            return {
+                voiceId: brainrotVoice.voiceId,
+                params: {
+                    stability: 0.3,
+                    similarity_boost: 0.7,
+                    style: 1,
+                    speed: 1.1
+                }
+            };
+            
+        case "italian_brainrot":
+            return {
+                voiceId: italianBrainrotVoice.voiceId,
+                params: {
+                    stability: 0.3,
+                    similarity_boost: 0.7,
+                    speed: 0.9,
+                    speaker_boost: true
+                }
+            };
+            
         case "pirate":
             return {
                 voiceId: pirateVoice.voiceId,
@@ -60,24 +102,37 @@ function getVoiceSettings(style) {
                 }
             };
             
-        case "italian_brainrot":
+        case "shakespeare":
             return {
-                voiceId: italianBrainrot.voiceId,
+                voiceId: shakespeareVoice.voiceId,
                 params: {
-                    stability: 0.3,
-                    similarity_boost: 0.7,
-                    speed: 0.9,
-                    speaker_boost: true
+                    stability: 0.6,
+                    similarity_boost: 0.75,
+                    style: 0,
+                    speed: 0.9
                 }
             };
             
-        default:
+        case "african_american":
             return {
-                voiceId: voice.voiceId,
+                voiceId: africanAmericanVoice.voiceId,
                 params: {
                     stability: 0.5,
-                    similarity_boost: 0.5,
-                    style: 0
+                    similarity_boost: 0.7,
+                    style: 0,
+                    speed: 0.9
+                }
+            };
+            
+        case "storyteller":
+            default:
+            return {
+                voiceId: storytellerVoice.voiceId,
+                params: {
+                    stability: 0.7,
+                    similarity_boost: 0.8,
+                    style: 0,
+                    speed: 0.85
                 }
             };
     }
@@ -173,118 +228,99 @@ app.post('/api/describe-event', async (req, res) => {
                  `- Don't use quotation marks\n` +
                  `- Don't use asterisks\n` +
                  `- Use era-appropriate slang naturally\n` +
-                 `- 1 concise paragraph (6-9 sentences)\n` +
-                 /*`- 1 concise sentence (1-3 words)\n` +
-                 `- just describe it in 3 words.\n` +*/
+                 /*`- 1 concise paragraph (6-9 sentences)\n` +*/
+                 `- 1 concise sentence (9-12 words)\n` +
+                 /*`- just describe it in 3 words\n` +*/
                  `- Avoid modern terms unless style specifies\n\n` +
                  `Slang Library to Use:\n`;
   
     // Style-specific slang libraries
     switch(style) {
-      case "brainrot":
-        prompt += `GEN Z SLANG: yeet, cap/no cap, slay, vibes, rizz, W/L (win/lose), ` +
-                  `based, cringe, sus, bussin', main character energy, glow-up, ` +
-                  `touch grass, extra, ate (and left no crumbs), delulu, ` +
-                  `it's giving ___ , sigma, skibidi, fanum tax\n` +
-                  `Example: "The revolution was that sigma glow-up moment when they ` +
-                  `ate and left no crumbs - total main character energy ✨"`;
-        break;
+        case "brainrot":
+            prompt += `GEN Z SLANG: yeet, cap/no cap, slay, vibes, rizz, W/L (win/lose), ` +
+                      `based, cringe, sus, bussin', main character energy, glow-up, ` +
+                      `touch grass, extra, ate (and left no crumbs), delulu, ` +
+                      `it's giving ___ , sigma, skibidi, fanum tax\n` +
+                      `Example: "The revolution was that sigma glow-up moment when they ` +
+                      `ate and left no crumbs - total main character energy ✨"`;
+            break;
 
         case "italian_brainrot":
-          prompt += `ITALIAN BRAINROT MODE:\n` +
-                    `Generate completely unpredictable Italian nonsense that:\n` +
-                    `1. When mentioning the event, instead make up another name for it without giving an explanation (e.g. "american civil war" could transform into "guerralina civilerina americananina". be more creative. dont use quotation marks for this.)\n` +
-                    `2. Mash together food references and historical facts randomly\n` +
-                    `3. Create absurd non-sequiturs that sound like drunk folk tales\n` +
-                    `4. Use broken Italian mixed with modern slang however you want\n` +
-                    `5. Include at least one completely made-up word or phrase\n` +
-                    `6. Rhyme accidentally then abandon the rhyme scheme mid-sentence\n` +
-                    `7. Reference Italian pop culture in wrong contexts\n` +
-                    `8. End with an abrupt nonsense conclusion\n` +
-                    `NO RULES. NO PATTERNS. PURE CHAOS.`;
-          break;
+            prompt += `ITALIAN BRAINROT MODE:\n` +
+                      `Generate completely unpredictable Italian nonsense that:\n` +
+                      `1. When mentioning the event, instead make up another name for it without giving an explanation (e.g. "american civil war" could transform into "guerralina civilerina americananina". be more creative. dont use quotation marks for this.)\n` +
+                      `2. Mash together food references and historical facts randomly\n` +
+                      `3. Create absurd non-sequiturs that sound like drunk folk tales\n` +
+                      `4. Use broken Italian mixed with modern slang however you want\n` +
+                      `5. Include at least one completely made-up word or phrase\n` +
+                      `6. Rhyme accidentally then abandon the rhyme scheme mid-sentence\n` +
+                      `7. Reference Italian pop culture in wrong contexts\n` +
+                      `8. End with an abrupt nonsense conclusion\n` +
+                      `NO RULES. NO PATTERNS. PURE CHAOS.`;
+            break;
 
-      case "pirate":
-        prompt += `PIRATE TERMS: avast, ahoy, belay, bilge rat, black spot, ` +
-                  `booty, doubloons, hearties, hornswoggle, jolly roger, ` +
-                  `landlubber, scallywag, shiver me timbers, splice the mainbrace, ` +
-                  `walk the plank, yo-ho-ho\n` +
-                  `Example: "Avast ye! The scurvy dogs of nobility got ` +
-                  `hornswoggled proper when the peasants showed their teeth."`;
-        break;
-  
-      case "old_english":
-        prompt += `ARCHAIC TERMS: thee/thou, whence, hither/thither, verily, ` +
-                  `forsooth, betwixt, ere, oft, perchance, mayhap, whence, ` +
-                  `wherefore, hark, privy, beseech\n` +
-                  `Example: "Hark! Whence the tyrant did falter, verily ` +
-                  `the commons arose with righteous fury most profound."`;
-        break;
-  
-      case "shakespeare":
-        prompt += `SHAKESPEAREAN: dost/thou art, fie, zounds, wherefore, ` +
-                  `prithee, mark me, by my troth, knave, varlet, ` +
-                  `star-crossed, all the world's a stage, ` +
-                  `[animal] comparisons (fox, serpent, dove)\n` +
-                  `Example: "Fie upon the king! Like serpents ` +
-                  `cloaked in flowers did the people strike."`;
-        break;
-  
-      case "valley_girl":
-        prompt += `VALLEY SLANG: like, totally, fer sure, whatever, ` +
-                  `as if, gag me, grody, hella, tubular, bitchin', ` +
-                  `psyche, barf out, mall rat.\n` +
-                  `use valley girl inflection (upspeak).\n` +
-                  `do not use asterisks.\n` +
-                  `Example: "So like, the king was all 'I rule everything' ` +
-                  `and the people were like, AS IF, and then totally ` +
-                  `yeeted him out?"`;
-        break;
-  
-      case "tech_bro":
-        prompt += `TECH JARGON: disrupt, pivot, synergy, blockchain, agile, ` +
-                  `bandwidth, deep dive, growth hacking, ideate, ` +
-                  `move fast and break things, paradigm shift, ` +
-                  `rockstar/ninja, scalable, thought leader\n` +
-                  `Example: "The peasants executed a perfect pivot from ` +
-                  `feudalism to democracy, disrupting the monarchy space ` +
-                  `with open-source governance protocols."`;
-        break;
-  
-      case "noir":
-        prompt += `NOIR PHRASES: dame, joe, gat, flatfoot, ` +
-                  `the big sleep, gumshoe, juice joint, ` +
-                  `"it was darker than a banker's heart", ` +
-                  `whiskey-voiced, smoke-filled rooms\n` +
-                  `Example: "It was rainin' revolution that night - ` +
-                  `the kind of rain that washes away blood but not memories. ` +
-                  `The king never saw the knife coming."`;
-        break;
+        case "pirate":
+            prompt += `PIRATE TERMS: avast, ahoy, belay, bilge rat, black spot, ` +
+                      `booty, doubloons, hearties, hornswoggle, jolly roger, ` +
+                      `landlubber, scallywag, shiver me timbers, splice the mainbrace, ` +
+                      `walk the plank, yo-ho-ho\n` +
+                      `Example: "Avast ye! The scurvy dogs of nobility got ` +
+                      `hornswoggled proper when the peasants showed their teeth."`;
+            break;
+            
+        case "shakespeare":
+            prompt += `SHAKESPEAREAN: dost/thou art, fie, zounds, wherefore, ` +
+                      `prithee, mark me, by my troth, knave, varlet, ` +
+                      `star-crossed, all the world's a stage, ` +
+                      `[animal] comparisons (fox, serpent, dove)\n` +
+                      `Example: "Fie upon the king! Like serpents ` +
+                      `cloaked in flowers did the people strike."`;
+            break;
+            
+        case "hood_slang":
+            prompt += `Use AUTHENTIC HOOD SLANG / AAVE: ` +
+                    `finna, cap/no cap, woke, deadass, extra, fam, flex, ` +
+                    `glow up, lit, on god, pull up, slide, vibes, y’all, bet, ` +
+                    `lowkey, sus, bussin, real one, ten toes, trap, drip\n` +
+                    `Sound confident, unfiltered, and like you're speakin' from the block — keep it real.\n` +
+                    `Example: "Deadass, them brothas was tired of the king flexin' on the people. ` +
+                    `So they pulled up, ten toes, said 'on god,' and made that brotha step down."`;
+            break;
+            
+        case "storyteller":
+            prompt += `WISE STORYTELLER STYLE: ancient wisdom, folk sayings, ` +
+                      `"they say that...", moral lessons, "long ago...", ` +
+                      `generational knowledge, "the elders tell us...", ` +
+                      `proverbs, circular storytelling\n` +
+                      `Example: "The elders say that when the people rose up, ` +
+                      `it was like the river breaking its banks - unstoppable ` +
+                      `yet natural, as all great changes must be."`;
+            break;
     }
   
     try {
-      const response = await axios.post('https://api.deepseek.com/v1/chat/completions', {
-        model: "deepseek-chat",
-        messages: [{
-          role: "user",
-          content: prompt
-        }],
-        temperature: style === "noir" ? 0.5 : 0.7 // Lower temp for noir's serious tone
-      }, {
-        headers: {
-          'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      });
-  
-      res.json({ 
-        description: response.data.choices[0].message.content 
-      });
+        const response = await axios.post('https://api.deepseek.com/v1/chat/completions', {
+            model: "deepseek-chat",
+            messages: [{
+                role: "user",
+                content: prompt
+            }],
+            temperature: 0.7
+        }, {
+            headers: {
+                'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+    
+        res.json({ 
+            description: response.data.choices[0].message.content 
+        });
     } catch (error) {
-      console.error("API Error:", error.response?.data || error.message);
-      res.status(500).json({ error: "API request failed" });
+        console.error("API Error:", error.response?.data || error.message);
+        res.status(500).json({ error: "API request failed" });
     }
-  });
+});
 
 
 
