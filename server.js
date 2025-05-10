@@ -47,59 +47,70 @@ const pirateVoice = new ElevenLabs({
     voiceId: "PPzYpIqttlTYA83688JI" // Example pirate voice ID
 });
 
+
+function getVoiceSettings(style) {
+    switch(style) {
+        case "pirate":
+            return {
+                voiceId: pirateVoice.voiceId,
+                params: {
+                    stability: 0.7,
+                    similarity_boost: 0.8,
+                    style: 1
+                }
+            };
+            
+        case "italian_brainrot":
+            return {
+                voiceId: italianBrainrot.voiceId,
+                params: {
+                    stability: 0.3,
+                    similarity_boost: 0.7,
+                    speed: 0.9,
+                    speaker_boost: true
+                }
+            };
+            
+        default:
+            return {
+                voiceId: voice.voiceId,
+                params: {
+                    stability: 0.5,
+                    similarity_boost: 0.5,
+                    style: 0
+                }
+            };
+    }
+}
+
+
+function cleanText(text) {
+    return text
+        .replace(/[*_#/]/g, ' ')  // Only replace specific formatting chars
+        .replace(/\[.*?\]/g, '')   // Remove text in brackets
+        .replace(/\s{2,}/g, ' ')   // Collapse multiple spaces into one
+        .trim();
+}
+
 // Add this new endpoint
 app.post('/api/generate-speech', async (req, res) => {
-  const { text, style } = req.body;
-  
-  try {
-      // Pre-process text to remove unwanted characters
-      const cleanText = text
-    .replace(/[*]/g, '')      // Remove asterisks (more explicit regex)
-    .replace(/_/g, ' ')       // Replace underscores with spaces
-    .replace(/#/g, '')        // Remove hash symbols
-    .replace(/\[.*?\]/g, ''); // Remove any text in brackets
-      
-      // Select voice based on style
-      let voiceToUse;
-      let voiceParams = {};
-      
-      switch(style) {
-          case "pirate":
-              voiceToUse = pirateVoice;
-              voiceParams = {
-                  stability: 0.7,
-                  similarityBoost: 0.8,
-                  style: 1
-              };
-              break;
-              
-          case "italian_brainrot":
-              voiceToUse = italianBrainrot;
-              voiceParams = {
-                  stability: 0.3,
-                  similarityBoost: 0.7,
-                  speed: 0.9,
-                  speakerBoost: true
-              };
-              break;
-              
-          default:
-              voiceToUse = voice;
-              voiceParams = {
-                  stability: 0.5,
-                  similarityBoost: 0.5,
-                  style: 0
-              };
-      }
+    const { text, style } = req.body;
+    
+    try {
+        // Pre-process text
+        const cleanText = cleanText(text);
 
-      // Make API call to ElevenLabs with timestamps
-      const response = await axios.post(
-          `https://api.elevenlabs.io/v1/text-to-speech/${voiceToUse.voiceId}/with-timestamps`,
-          {
-              text: cleanText,  // Use the cleaned text here
-              model_id: "eleven_monolingual_v1",
-              voice_settings: voiceParams
-          },
+        // Get voice settings
+        const { voiceId, params } = getVoiceSettings(style);
+
+        // Make API call to ElevenLabs with timestamps
+        const response = await axios.post(
+            `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`,
+            {
+                text: cleanText,
+                model_id: "eleven_monolingual_v1",
+                voice_settings: params
+            },
           {
               headers: {
                   'xi-api-key': process.env.ELEVENLABS_API_KEY,
@@ -109,22 +120,8 @@ app.post('/api/generate-speech', async (req, res) => {
           }
       );
 
-      // Print the timestamps to console
-      console.log("Received timestamps from ElevenLabs:");
-      console.log("Raw alignment data:", response.data.alignment);
-      console.log("Raw normalized alignment data:", response.data.normalized_alignment);
-
-      // Format and print character-level timestamps
-      if (response.data.alignment) {
-          console.log("\nCharacter-level timestamps:");
-          response.data.alignment.characters.forEach((char, index) => {
-              console.log(`Character: '${char}' | Start: ${response.data.alignment.character_start_times_seconds[index]}s | End: ${response.data.alignment.character_end_times_seconds[index]}s`);
-          });
-      }
-
-      // Convert base64 audio to buffer and stream it
+      // [Rest of your existing code...]
       const audioBuffer = Buffer.from(response.data.audio_base64, 'base64');
-      
       res.setHeader('Content-Type', 'audio/mpeg');
       res.send(audioBuffer);
       
@@ -308,17 +305,16 @@ app.post('/api/describe-event', async (req, res) => {
     const { imageUrl, text, style } = req.body;
     
     try {
+        // Get voice settings
+        const { voiceId, params } = getVoiceSettings(style);
+
         // 1. Get the audio stream WITH TIMESTAMPS
         const audioResponse = await axios.post(
-            `https://api.elevenlabs.io/v1/text-to-speech/${style === 'pirate' ? pirateVoice.voiceId : 
-              style === 'italian_brainrot' ? italianBrainrot.voiceId : voice.voiceId}/with-timestamps`,
+            `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`,
             {
                 text: text,
                 model_id: "eleven_monolingual_v1",
-                voice_settings: {
-                    stability: style === 'italian_brainrot' ? 0.3 : 0.5,
-                    similarity_boost: style === 'italian_brainrot' ? 0.7 : 0.5
-                }
+                voice_settings: params
             },
             {
                 headers: {
@@ -354,7 +350,7 @@ app.post('/api/describe-event', async (req, res) => {
             const charEnd = alignment.character_end_times_seconds[index];
 
             // Build current word
-            if (char !== ' ' && char !== ',' && char !== '.' && char !== '!' && char !== '?') {
+            if (char !== ' ') {
                 if (currentWord.text === '') {
                     currentWord.start = charStart;
                 }
@@ -415,7 +411,7 @@ app.post('/api/describe-event', async (req, res) => {
           
           // Determine max words based on average length
           let maxWords;
-          if (avgWordLength > 5) {
+          if (avgWordLength > 4) {
               maxWords = 3; // Very long words - max 3 words per segment
           } else if (avgWordLength > 2) {
               maxWords = 4; // Medium-long words - max 4 words
@@ -588,7 +584,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 }
             }
             
-            assContent += `Dialogue: 0,${wordStart},${wordEnd},Default,,0,0,50,,${highlightedText}\n`;
+            assContent += `Dialogue: 0,${wordStart},${wordEnd},Default,,0,0,200,,${highlightedText}\n`;
         }
     });
 
