@@ -1,6 +1,9 @@
 const express = require('express');
 const axios = require('axios');
 
+const assParser = require('ass-parser');
+const assStringify = require('ass-stringify');
+
 const app = express();
 const PORT = 3000;
 
@@ -173,8 +176,9 @@ app.post('/api/describe-event', async (req, res) => {
                  `- Don't use quotation marks\n` +
                  `- Don't use asterisks\n` +
                  `- Use era-appropriate slang naturally\n` +
-                 /*`- 1 concise paragraph (4-6 sentences)\n` +*/
-                 `- 1 concise sentence (1-3 words)\n` +
+                 `- 1 concise paragraph (6-9 sentences)\n` +
+                 /*`- 1 concise sentence (1-3 words)\n` +
+                 `- just describe it in 3 words.\n` +*/
                  `- Avoid modern terms unless style specifies\n\n` +
                  `Slang Library to Use:\n`;
   
@@ -286,6 +290,16 @@ app.post('/api/describe-event', async (req, res) => {
   });
 
 
+
+
+  function secondsToAssTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    const centiseconds = Math.floor((secs - Math.floor(secs)) * 100);
+    
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${Math.floor(secs).toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
+}
 
 
 
@@ -448,6 +462,29 @@ app.post('/api/describe-event', async (req, res) => {
           }
       });
 
+
+
+
+      console.log("\n=== RAW TIMING DATA ===");
+console.log("Alignment Data:", JSON.stringify(alignment, null, 2));
+
+if (alignment) {
+    console.log("\nCharacter-level details:");
+    console.log("Characters:", alignment.characters.join(''));
+    console.log("Start Times:", alignment.character_start_times_seconds);
+    console.log("End Times:", alignment.character_end_times_seconds);
+    
+    // Print character-by-character timeline
+    console.log("\nDetailed Timeline:");
+    alignment.characters.forEach((char, i) => {
+        console.log(`[${alignment.character_start_times_seconds[i].toFixed(3)}s-${alignment.character_end_times_seconds[i].toFixed(3)}s] '${char}'`);
+    });
+}
+
+
+
+
+
         console.log("Final phrases with precise timings:", finalPhrases);
         const totalDuration = finalPhrases[finalPhrases.length - 1].end;
 
@@ -489,91 +526,137 @@ app.post('/api/describe-event', async (req, res) => {
                 .run();
         });
 
-       // 6. Generate FFmpeg filter with exact letter positioning
-let filterChain = [];
-finalPhrases.forEach((phrase, i) => {
-    const charWidth = 12;
-    const spaceWidth = 5;
-    let currentXPosition = 0;
+      // 6. Generate ASS subtitles manually
+function generateAssSubtitles(phrases) {
+    let assContent = `[Script Info]
+Title: Karaoke Subtitles
+ScriptType: v4.00+
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+PlayResX: 256
+PlayResY: 456
 
-    // Draw each character but make them all appear at phrase.start simultaneously
-    for (let j = 0; j < phrase.text.length; j++) {
-        const letter = phrase.text[j];
-        const escapedLetter = letter.replace(/'/g, "'\\''")
-                                  .replace(/:/g, '\\:')
-                                  .replace(/,/g, '\\,');
-        const width = (letter === ' ') ? spaceWidth : charWidth;
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Roboto Black,18,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,1,1,2,10,10,10,1
 
-        filterChain.push(
-            `drawtext=fontfile=rubik.ttf:` +
-            `text='${escapedLetter}':` +
-            `fontcolor=white:` +
-            `fontsize=14:` +
-            `x=(w-${getTotalTextWidth(phrase.text, charWidth, spaceWidth)})/2+${currentXPosition}:` +
-            `y=h-line_h-50:` +
-            `bordercolor=black:` +
-            `borderw=1:` +
-            `shadowcolor=black:` +
-            `shadowx=1:` +
-            `shadowy=1:` +
-            // KEY CHANGE: All characters appear at phrase.start simultaneously
-            `enable='between(t,${phrase.start},${phrase.end})'`
-        );
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
 
-        currentXPosition += width;
-    }
-});
+    phrases.forEach(phrase => {
+        // First process words to get correct end times
+        const processedWords = [];
+        
+        for (let i = 0; i < phrase.words.length; i++) {
+            const currentWord = phrase.words[i];
+            let wordEnd = currentWord.end;
+            
+            // If there's a next word, extend this word's end time 
+            // to the next word's start time (including any space)
+            if (i < phrase.words.length - 1) {
+                wordEnd = phrase.words[i + 1].start;
+            }
+            
+            processedWords.push({
+                text: currentWord.text,
+                start: currentWord.start,
+                end: wordEnd
+            });
+        }
 
-function getTotalTextWidth(text, charWidth, spaceWidth) {
-    let total = 0;
-    for (let i = 0; i < text.length; i++) {
-        total += (text[i] === ' ') ? spaceWidth : charWidth;
-    }
-    return total;
+        // Generate karaoke subtitles with adjusted timings
+        for (let i = 0; i < processedWords.length; i++) {
+            const word = processedWords[i];
+            const wordStart = secondsToAssTime(word.start);
+            const wordEnd = secondsToAssTime(word.end);
+            
+            // Skip empty words (spaces)
+            if (!word.text.trim()) continue;
+            
+            // Create highlighted version
+            let highlightedText = '';
+            for (let j = 0; j < processedWords.length; j++) {
+                if (j === i) {
+                    highlightedText += `{\\c&H00FFFF&}${processedWords[j].text}{\\c&HFFFFFF&}`;
+                } else {
+                    highlightedText += processedWords[j].text;
+                }
+                
+                if (j < processedWords.length - 1) {
+                    highlightedText += ' ';
+                }
+            }
+            
+            assContent += `Dialogue: 0,${wordStart},${wordEnd},Default,,0,0,50,,${highlightedText}\n`;
+        }
+    });
+
+    return assContent;
 }
 
-const drawtextFilters = `scale=256:456,${filterChain.join(',')}`;
+function secondsToAssTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    const centiseconds = Math.floor((secs - Math.floor(secs)) * 100);
+    
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${Math.floor(secs).toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
+}
 
-        // 7. Create video with phrase-by-phrase display
-        await new Promise((resolve, reject) => {
-            ffmpeg()
-                .input(paddedImagePath)
-                .inputOptions([
-                    '-loop 1',
-                    `-t ${totalDuration}`
-                ])
-                .input(audioPath)
-                .videoCodec('libx264')
-                .audioCodec('aac')
-                .outputOptions([
-                    '-vf',
-                    drawtextFilters,
-                    '-pix_fmt yuv420p',
-                    '-shortest',
-                    '-movflags +faststart',
-                    '-r 30'
-                ])
-                .output(videoPath)
-                .on('end', () => {
-                    console.log(`Video generated with duration: ${totalDuration}s`);
-                    console.log('Phrase display sequence:');
-                    finalPhrases.forEach(p => console.log(`[${p.start.toFixed(2)}s-${p.end.toFixed(2)}s]: ${p.text}`));
-                    resolve();
-                })
-                .on('error', reject)
-                .run();
-        });
-        
-        // 8. Read and send video
-        const videoBuffer = await fs.promises.readFile(videoPath);
-        
-        // 9. Clean up
-        await Promise.all([
-            fs.promises.unlink(audioPath),
-            fs.promises.unlink(imagePath),
-            fs.promises.unlink(paddedImagePath),
-            fs.promises.unlink(videoPath)
-        ].map(p => p.catch(console.error)));
+// Create ASS file
+const assContent = generateAssSubtitles(finalPhrases);
+const assPath = path.join(tempDir, `subtitles-${Date.now()}.ass`);
+await fs.promises.writeFile(assPath, assContent);
+
+// 7. Create video with ASS subtitles (Windows-specific path handling)
+const escapedAssPath = assPath.replace(/\\/g, '\\\\').replace(/:/g, '\\:');
+await new Promise((resolve, reject) => {
+    ffmpeg()
+        .input(paddedImagePath)
+        .inputOptions([
+            '-loop 1',
+            `-t ${totalDuration}`
+        ])
+        .input(audioPath)
+        .videoCodec('libx264')
+        .audioCodec('aac')
+        .complexFilter([
+            `[0:v]scale=256:456,ass='${escapedAssPath}'[v]`
+        ])
+        .outputOptions([
+            '-map', '[v]',
+            '-map', '1:a',
+            '-pix_fmt', 'yuv420p',
+            '-shortest',
+            '-movflags', '+faststart',
+            '-r', '30'
+        ])
+        .output(videoPath)
+        .on('end', () => {
+            console.log(`Video generated with duration: ${totalDuration}s`);
+            console.log('Phrase display sequence:');
+            finalPhrases.forEach(p => console.log(`[${p.start.toFixed(2)}s-${p.end.toFixed(2)}s]: ${p.text}`));
+            resolve();
+        })
+        .on('error', (err) => {
+            console.error('FFmpeg error:', err);
+            reject(err);
+        })
+        .run();
+});
+
+// 8. Read and send video
+const videoBuffer = await fs.promises.readFile(videoPath);
+
+// 9. Clean up (add the ASS file to cleanup)
+await Promise.all([
+    fs.promises.unlink(audioPath),
+    fs.promises.unlink(imagePath),
+    fs.promises.unlink(paddedImagePath),
+    fs.promises.unlink(videoPath),
+    fs.promises.unlink(assPath)
+].map(p => p.catch(console.error)));
         
         res.setHeader('Content-Type', 'video/mp4');
         res.send(videoBuffer);
