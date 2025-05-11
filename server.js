@@ -67,6 +67,16 @@ const storytellerVoice = new ElevenLabs({
     voiceId: "dPah2VEoifKnZT37774q"
 });
 
+const ukrainianManVoice = new ElevenLabs({
+    apiKey: process.env.ELEVENLABS_API_KEY,
+    voiceId: "BEprpS2vpgM32yNJpTXq"
+});
+
+const matterOfFactVoice = new ElevenLabs({
+    apiKey: process.env.ELEVENLABS_API_KEY,
+    voiceId: "WzsP0bfiCpSDfNgLrUuN"
+});
+
 
 function getVoiceSettings(style) {
     switch(style) {
@@ -87,7 +97,7 @@ function getVoiceSettings(style) {
                 params: {
                     stability: 0.3,
                     similarity_boost: 0.7,
-                    speed: 0.9,
+                    speed: 0.95,
                     speaker_boost: true
                 }
             };
@@ -123,6 +133,30 @@ function getVoiceSettings(style) {
                     speed: 0.9
                 }
             };
+
+        case "ukrainian_man":
+            return {
+                voiceId: ukrainianManVoice.voiceId,
+                params: {
+                    stability: 0.4,
+                    similarity_boost: 0.8,
+                    style: 0.7,
+                    speed: 0.8,
+                    speaker_boost: true
+                }
+            };
+
+        case "matter_of_fact":
+            return {
+                voiceId: matterOfFactVoice.voiceId,
+                params: {
+                    stability: 0.7,       // Slightly lower stability
+                    similarity_boost: 0.8, // Slightly lower similarity
+                    style: 0.2,           // Small style boost
+                    speed: 1,
+                    speaker_boost: false  // Disable speaker boost
+                }
+            };
             
         case "storyteller":
             default:
@@ -132,12 +166,17 @@ function getVoiceSettings(style) {
                     stability: 0.7,
                     similarity_boost: 0.8,
                     style: 0,
-                    speed: 0.85
+                    speed: 0.9
                 }
             };
+            
     }
 }
 
+function removeAsterisks(text) {
+    // Remove all asterisks and any extra spaces they might leave
+    return text.replace(/\*/g, '').replace(/\s{2,}/g, ' ').trim();
+}
 
 function cleanText(text) {
     return text
@@ -195,14 +234,15 @@ app.post('/api/generate-image', async (req, res) => {
 
         const prompt = `Realistic high quality photo depiction of historical event: ${event}`;
         
-        // Correct DALL-E 2 parameters:
+        //  DALL-E parameters:
         const response = await openai.images.generate({
             model: "dall-e-2",
             prompt: prompt,
+            //quality: "hd", //remove when using dall-e-2
+            //style: "natural", //natural or vivid (dall-e-3 only)
             size: "256x256", // Only supported sizes: 256x256, 512x512, 1024x1024
             n: 1,
-            // Remove 'quality' parameter completely
-            response_format: "url" // Explicitly request URL format
+            response_format: "url"
         });
 
         res.json({ 
@@ -227,10 +267,11 @@ app.post('/api/describe-event', async (req, res) => {
                  `- No asterisks or dashes (-)\n` +
                  `- Don't use quotation marks\n` +
                  `- Don't use asterisks\n` +
+                 `- do not answer with asterisks in any case. never use asterisks in the answer.\n` +
                  `- Use era-appropriate slang naturally\n` +
-                 /*`- 1 concise paragraph (6-9 sentences)\n` +*/
-                 `- 1 concise sentence (9-12 words)\n` +
-                 /*`- just describe it in 3 words\n` +*/
+                 //`- 1 concise paragraph (1-2 sentences)\n` +
+                 `- 1 concise sentence (1-5 words)\n` +
+                 //`- just describe it in 3 words\n` +
                  `- Avoid modern terms unless style specifies\n\n` +
                  `Slang Library to Use:\n`;
   
@@ -287,12 +328,37 @@ app.post('/api/describe-event', async (req, res) => {
                     `So they pulled up, ten toes, said 'on god,' and made that brotha step down."`;
             break;
             
+        case "ukrainian_man":
+            prompt += `ukrainian MAN SPEAKING ENGLISH:\n` +
+                    `- Make it funny, very funny, add jokes, add layer of sarcasm, add stoic humour.\n` +
+                    `- Heavy ukrainian accent (write phonetically: "v" instead of "w", "z" instead of "th")\n` +
+                    `- Typical ukrainian expressions\n` +
+                    `- Vodka references\n` +
+                    `- Slightly broken grammar: "Is not problem", "What this nonsense?", others...`;
+            break;
+
+
+        case "matter_of_fact":
+            prompt = `Describe "${event}" in a strictly factual, educational tone. Rules:\n` +
+                    `do not use asterisks in the response (*) \n` +
+                    `- Use neutral, academic language\n` +
+                    `- Present facts only\n` +
+                    `- Avoid opinions, humor, or dramatic language\n` +
+                    `- Maintain objective perspective\n` +
+                    `- Use proper historical terminology\n` +
+                    `Example: "${event} occurred in [year] when [key actors] [actions], resulting in [outcome]. This event is significant because [historical impact]."\n\n` +
+                    `Additional Guidelines:\n` +
+                    `- Cite dates when known\n` +
+                    `- Mention primary actors/parties involved\n` +
+                    `- Note immediate consequences\n` +
+                    `- Reference broader historical significance\n` +
+                    `- Avoid colloquialisms and metaphors`;
+            break;
+            
         case "storyteller":
-            prompt += `WISE STORYTELLER STYLE: ancient wisdom, folk sayings, ` +
-                      `"they say that...", moral lessons, "long ago...", ` +
-                      `generational knowledge, "the elders tell us...", ` +
+            prompt += `WISE STORYTELLER STYLE ` +
                       `proverbs, circular storytelling\n` +
-                      `Example: "The elders say that when the people rose up, ` +
+                      `when the people rose up, ` +
                       `it was like the river breaking its banks - unstoppable ` +
                       `yet natural, as all great changes must be."`;
             break;
@@ -312,9 +378,12 @@ app.post('/api/describe-event', async (req, res) => {
                 'Content-Type': 'application/json'
             }
         });
-    
+
+        // Clean the response text
+        const cleanDescription = removeAsterisks(response.data.choices[0].message.content);
+        
         res.json({ 
-            description: response.data.choices[0].message.content 
+            description: cleanDescription 
         });
     } catch (error) {
         console.error("API Error:", error.response?.data || error.message);
@@ -528,6 +597,7 @@ if (alignment) {
         const tempDir = tmpdir();
         const audioPath = path.join(tempDir, `audio-${Date.now()}.mp3`);
         const imagePath = path.join(tempDir, `image-${Date.now()}.png`);
+        const upscaledImagePath = path.join(tempDir, `upscaled-image-${Date.now()}.png`);
         const paddedImagePath = path.join(tempDir, `padded-image-${Date.now()}.png`);
         const videoPath = path.join(tempDir, `video-${Date.now()}.mp4`);
         
@@ -536,27 +606,42 @@ if (alignment) {
             fs.promises.writeFile(imagePath, imageBuffer)
         ]);
 
-        // 5. Create padded image (9:16 aspect ratio)
-        await new Promise((resolve, reject) => {
-            ffmpeg()
-                .input(imagePath)
-                .complexFilter([
-                    {
-                        filter: 'pad',
-                        options: {
-                            width: 'iw',
-                            height: 'iw*16/9',
-                            x: 0,
-                            y: '(oh-ih)/2',
-                            color: 'black'
-                        }
-                    }
-                ])
-                .output(paddedImagePath)
-                .on('end', resolve)
-                .on('error', reject)
-                .run();
-        });
+        // 5. Upscale and pad the image (FIXED VERSION)
+await new Promise((resolve, reject) => {
+    ffmpeg()
+        .input(imagePath)
+        .complexFilter([
+            // Combine scaling and padding in a single filter chain
+            {
+                filter: 'scale',
+                options: {
+                    w: 1080,
+                    h: 1080,
+                    flags: 'lanczos'
+                },
+                outputs: 'scaled'
+            },
+            {
+                filter: 'pad',
+                options: {
+                    width: 1080,
+                    height: 1920,
+                    x: 0,
+                    y: '(oh-ih)/2',
+                    color: 'black'
+                },
+                inputs: 'scaled',
+                outputs: 'padded'
+            }
+        ])
+        .outputOptions([
+            '-map', '[padded]'  // Explicitly map the output of the pad filter
+        ])
+        .output(paddedImagePath)
+        .on('end', resolve)
+        .on('error', reject)
+        .run();
+});
 
       // 6. Generate ASS subtitles manually
 function generateAssSubtitles(phrases) {
@@ -565,12 +650,12 @@ Title: Karaoke Subtitles
 ScriptType: v4.00+
 WrapStyle: 0
 ScaledBorderAndShadow: yes
-PlayResX: 256
-PlayResY: 456
+PlayResX: 1080
+PlayResY: 1920
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Roboto Black,18,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,1,1,2,10,10,10,1
+Style: Default,Roboto Black,72,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,1,1,2,10,10,10,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -620,7 +705,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 }
             }
             
-            assContent += `Dialogue: 0,${wordStart},${wordEnd},Default,,0,0,200,,${highlightedText}\n`;
+            assContent += `Dialogue: 0,${wordStart},${wordEnd},Default,,0,0,700,,${highlightedText}\n`;
         }
     });
 
@@ -654,7 +739,7 @@ await new Promise((resolve, reject) => {
         .videoCodec('libx264')
         .audioCodec('aac')
         .complexFilter([
-            `[0:v]scale=256:456,ass='${escapedAssPath}'[v]`
+            `[0:v]scale=1080:1920,ass='${escapedAssPath}'[v]`
         ])
         .outputOptions([
             '-map', '[v]',
