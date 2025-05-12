@@ -236,11 +236,11 @@ app.post('/api/generate-image', async (req, res) => {
         
         //  DALL-E parameters:
         const response = await openai.images.generate({
-            model: "dall-e-2",
+            model: "dall-e-3",
             prompt: prompt,
-            //quality: "hd", //remove when using dall-e-2
-            //style: "natural", //natural or vivid (dall-e-3 only)
-            size: "256x256", // Only supported sizes: 256x256, 512x512, 1024x1024
+            quality: "hd", //remove when using dall-e-2
+            style: "natural", //natural or vivid (dall-e-3 only)
+            size: "1024x1024", // Only supported sizes: 256x256, 512x512, 1024x1024
             n: 1,
             response_format: "url"
         });
@@ -269,8 +269,8 @@ app.post('/api/describe-event', async (req, res) => {
                  `- Don't use asterisks\n` +
                  `- do not answer with asterisks in any case. never use asterisks in the answer.\n` +
                  `- Use era-appropriate slang naturally\n` +
-                 //`- 1 concise paragraph (1-2 sentences)\n` +
-                 `- 1 concise sentence (1-5 words)\n` +
+                 `- 1 concise paragraph (2-3 sentences)\n` +
+                 //`- 1 sentence (9-13 words)\n` +
                  //`- just describe it in 3 words\n` +
                  `- Avoid modern terms unless style specifies\n\n` +
                  `Slang Library to Use:\n`;
