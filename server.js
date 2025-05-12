@@ -74,7 +74,7 @@ const ukrainianManVoice = new ElevenLabs({
 
 const matterOfFactVoice = new ElevenLabs({
     apiKey: process.env.ELEVENLABS_API_KEY,
-    voiceId: "WzsP0bfiCpSDfNgLrUuN"
+    voiceId: "dPah2VEoifKnZT37774q"
 });
 
 
@@ -150,11 +150,10 @@ function getVoiceSettings(style) {
             return {
                 voiceId: matterOfFactVoice.voiceId,
                 params: {
-                    stability: 0.7,       // Slightly lower stability
-                    similarity_boost: 0.8, // Slightly lower similarity
-                    style: 0.2,           // Small style boost
-                    speed: 1,
-                    speaker_boost: false  // Disable speaker boost
+                    stability: 0.7,
+                    similarity_boost: 0.8,
+                    style: 0,
+                    speed: 0.95
                 }
             };
             
@@ -236,11 +235,11 @@ app.post('/api/generate-image', async (req, res) => {
         
         //  DALL-E parameters:
         const response = await openai.images.generate({
-            model: "dall-e-3",
-            prompt: prompt,
-            quality: "hd", //remove when using dall-e-2
-            style: "natural", //natural or vivid (dall-e-3 only)
-            size: "1024x1024", // Only supported sizes: 256x256, 512x512, 1024x1024
+            model: "dall-e-2",
+            prompt: prompt+", in an educational, and historical style, with no graphic content",
+            //quality: "hd", //remove when using dall-e-2
+            //style: "natural", //natural or vivid (dall-e-3 only)
+            size: "256x256", // Only supported sizes: 256x256, 512x512, 1024x1024
             n: 1,
             response_format: "url"
         });
@@ -269,11 +268,10 @@ app.post('/api/describe-event', async (req, res) => {
                  `- Don't use asterisks\n` +
                  `- do not answer with asterisks in any case. never use asterisks in the answer.\n` +
                  `- Use era-appropriate slang naturally\n` +
-                 `- 1 concise paragraph (2-3 sentences)\n` +
-                 //`- 1 sentence (9-13 words)\n` +
+                 //`- 1 concise paragraph (2-3 sentences)\n` +
+                 `- 1 sentence (9-13 words)\n` +
                  //`- just describe it in 3 words\n` +
-                 `- Avoid modern terms unless style specifies\n\n` +
-                 `Slang Library to Use:\n`;
+                 `Style and Dialect Library to Use:\n`;
   
     // Style-specific slang libraries
     switch(style) {
@@ -566,7 +564,7 @@ app.post('/api/describe-event', async (req, res) => {
 
 
 
-      console.log("\n=== RAW TIMING DATA ===");
+    /*  console.log("\n=== RAW TIMING DATA ===");
 console.log("Alignment Data:", JSON.stringify(alignment, null, 2));
 
 if (alignment) {
@@ -580,13 +578,13 @@ if (alignment) {
     alignment.characters.forEach((char, i) => {
         console.log(`[${alignment.character_start_times_seconds[i].toFixed(3)}s-${alignment.character_end_times_seconds[i].toFixed(3)}s] '${char}'`);
     });
-}
+}*/
 
 
 
 
 
-        console.log("Final phrases with precise timings:", finalPhrases);
+        //console.log("Final phrases with precise timings:", finalPhrases);
 
         const totalDuration = finalPhrases[finalPhrases.length - 1].end;
 
@@ -752,9 +750,9 @@ await new Promise((resolve, reject) => {
         ])
         .output(videoPath)
         .on('end', () => {
-            console.log(`Video generated with duration: ${totalDuration}s`);
-            console.log('Phrase display sequence:');
-            finalPhrases.forEach(p => console.log(`[${p.start.toFixed(2)}s-${p.end.toFixed(2)}s]: ${p.text}`));
+           // console.log(`Video generated with duration: ${totalDuration}s`);
+           // console.log('Phrase display sequence:');
+            //finalPhrases.forEach(p => console.log(`[${p.start.toFixed(2)}s-${p.end.toFixed(2)}s]: ${p.text}`));
             resolve();
         })
         .on('error', (err) => {
