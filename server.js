@@ -39,7 +39,7 @@ const voice = new ElevenLabs({
 
 const brainrotVoice = new ElevenLabs({
     apiKey: process.env.ELEVENLABS_API_KEY,
-    voiceId: "CwhRBWXzGAHq8TQ4Fs17"
+    voiceId: "pNInz6obpgDQGcFmaJgB"
 });
 
 const italianBrainrotVoice = new ElevenLabs({
@@ -84,10 +84,10 @@ function getVoiceSettings(style) {
             return {
                 voiceId: brainrotVoice.voiceId,
                 params: {
-                    stability: 0.3,
-                    similarity_boost: 0.7,
+                    stability: 1,
+                    similarity_boost: 1,
                     style: 1,
-                    speed: 1.1
+                    speed: 0.9
                 }
             };
             
@@ -576,7 +576,7 @@ if (alignment) {
     console.log("End Times:", alignment.character_end_times_seconds);
     
     // Print character-by-character timeline
-    console.log("\nDetailed Timeline:");
+    //console.log("\nDetailed Timeline:");
     alignment.characters.forEach((char, i) => {
         console.log(`[${alignment.character_start_times_seconds[i].toFixed(3)}s-${alignment.character_end_times_seconds[i].toFixed(3)}s] '${char}'`);
     });
@@ -587,6 +587,7 @@ if (alignment) {
 
 
         console.log("Final phrases with precise timings:", finalPhrases);
+
         const totalDuration = finalPhrases[finalPhrases.length - 1].end;
 
         // 3. Download the image
