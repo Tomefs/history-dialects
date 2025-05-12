@@ -1,41 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Historical Event Describer</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
     <h1>Historical Event Describer</h1>
     <p>Describe any historical event in different styles and languages!</p>
-    
+
     <form id="eventForm">
-        <div class="input-group">
-            <label for="event">Historical Event:</label>
-            <input type="text" id="event" placeholder="E.g., Moon Landing, French Revolution" required>
+      <div class="input-group">
+        <label for="event">Historical Event:</label>
+        <input
+          type="text"
+          id="event"
+          placeholder="E.g., Moon Landing, French Revolution"
+          required
+        />
+      </div>
+
+      <div class="input-group">
+        <label for="style">Description Style:</label>
+        <div class="scrollable-container">
+          <div class="style-grid" id="styleGrid">
+            <div class="style-option" data-value="brainrot">
+              <img src="images/brainrot.jpg" alt="Gen Z Brainrot" />
+              <span>Gen Z Brainrot</span>
+            </div>
+            <div class="style-option" data-value="italian_brainrot">
+              <img src="images/italian_brainrot.jpeg" alt="Italian Brainrot" />
+              <span>Italian Brainrot</span>
+            </div>
+            <div class="style-option" data-value="pirate">
+              <img src="images/pirate.jpg" alt="Pirate Speak" />
+              <span>Pirate Speak</span>
+            </div>
+            <div class="style-option" data-value="shakespeare">
+              <img src="images/shakespeare.jpg" alt="Shakespearean" />
+              <span>Shakespearean</span>
+            </div>
+            <div class="style-option" data-value="african_american">
+              <img src="images/african_american.png" alt="African American Vernacular"/>
+              <span>African American Vernacular</span>
+            </div>
+            <div class="style-option" data-value="storyteller">
+              <img src="images/storyteller.png" alt="Wise Storyteller" />
+              <span>Storyteller</span>
+            </div>
+            <div class="style-option" data-value="ukrainian_man">
+              <img src="images/ukrainian_man.jpg" alt="Ukrainian Man" />
+              <span>Ukrainian Man</span>
+            </div>
+            <div class="style-option" data-value="matter_of_fact">
+              <img src="images/matter_of_fact.png" alt="Factual, Serious" />
+              <span>Factual, Serious</span>
+            </div>
+          </div>
         </div>
-        
-        <div class="input-group">
-            <label for="style">Description Style:</label>
-            <select id="style" required>
-                <option value="">-- Select a style --</option>
-                <option value="brainrot">Gen Z Brainrot</option>
-                <option value="italian_brainrot">Italian Brainrot</option>
-                <option value="pirate">Pirate Speak</option>
-                <option value="shakespeare">Shakespearean</option>
-                <option value="african_american">African American Vernacular</option>
-                <option value="storyteller">Wise Storyteller</option>
-                <option value="ukrainian_man">Ukrainian Man</option>
-                <option value="matter_of_fact">Factual, Serious</option>
-            </select>
-        </div>
-        
-        <button type="submit">Describe Event</button>
+        <input type="hidden" id="style" name="style" required />
+      </div>
+
+      <button type="submit">Describe Event</button>
     </form>
-    
+
     <div id="result"></div>
 
     <script src="script.js"></script>
-</body>
+    <script src="select.js"></script>
+  </body>
 </html>
