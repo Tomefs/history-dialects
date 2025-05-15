@@ -6,6 +6,30 @@ body {
     text-align: center;
     background-color: black;
     color: whitesmoke;
+    font-family: 'Arial', sans-serif;
+}
+
+header {
+    position: relative;
+    display: flex;
+    text-align: left;
+    align-items: center;
+}
+
+header h1 {
+    bottom: 50px;
+    font-size: 36px;
+    text-transform: uppercase;
+    font-weight: lighter;
+}
+
+header p{
+    position: absolute;
+    left: 43%;
+    width: 300px;
+    font-size: 15px;
+    color: whitesmoke;
+    opacity: 0.6;
 }
 
 .input-group {
@@ -16,12 +40,14 @@ body {
 label {
     display: block;
     margin-bottom: 10px;
+    font-size: 20px;
+    font-weight: lighter;
 }
 
 input{
     width: 100%;
     padding: 10px;
-    border: 1px solid #ddd;
+    border: none;
     border-radius: 4px;
     font-size: 16px;
     background: none;
@@ -29,7 +55,7 @@ input{
 }
 
 .scrollable-container {
-    max-height: 400px; /* Set the maximum height */
+    max-height: 300px; /* Set the maximum height */
     width: 100%;
     overflow-y: auto; /* Enable vertical scrolling */
     border: 1px solid #ccc;
@@ -37,13 +63,13 @@ input{
     border: none;
     border-radius: 4px;
     background: none;
-    scrollbar-color: black #ddd; /* Firefox */
+    scrollbar-color: whitesmoke black; /* Firefox */
 }
 
 .style-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: 5px;
     margin-top: 10px;
 }
 
@@ -80,12 +106,15 @@ input{
 }
 
 .style-option:hover {
-    background-color: #e0e0e0;
     transform: scale(1.01);
 }
 
 .style-option:hover, .style-option.selected {
     opacity: 1; /* Full opacity on hover or when selected */
+    span{
+        background-color: whitesmoke;
+        color: black;
+    }
 }
 
 button {
@@ -212,7 +241,6 @@ button:hover {
 .right-column {
     flex: 2;
     margin-left: 30px;
-    border: 1px solid #ddd;
     border-radius: 4px;
     padding: 15px;
     background-color: #f9f9f9;
