@@ -31,6 +31,7 @@ input, select {
 
 .scrollable-container {
     max-height: 400px; /* Set the maximum height */
+    width: 100%;
     overflow-y: auto; /* Enable vertical scrolling */
     border: 1px solid #ccc;
     padding: 10px;
@@ -39,7 +40,7 @@ input, select {
 
 .style-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr); /* Two columns */
+    grid-template-columns: repeat(1, 1fr); /* Two columns */
     gap: 10px;
     margin-top: 10px;
 }
@@ -115,27 +116,25 @@ button:hover {
     background-color: #f9f9f9;
 }
 
-
 .history-image {
     max-width: 100%;
     border-radius: 8px;
     margin: 15px 0;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-  
-  .spinner {
+}
+
+.spinner {
     color: #666;
     font-style: italic;
     margin: 10px 0;
-  }
-  
-  .error {
+}
+
+.error {
     color: #d32f2f;
     margin-top: 10px;
-  }
+}
 
-
-  .spinner {
+.spinner {
     animation: spin 1s linear infinite;
     width: 24px;
     height: 24px;
@@ -207,4 +206,24 @@ button:hover {
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+.main-container {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+}
+
+.left-column {
+    flex: 1;
+    display: flex;
+}
+
+.right-column {
+    flex: 2;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    min-height: 300px;
 }
