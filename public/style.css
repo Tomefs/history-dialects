@@ -1,13 +1,11 @@
 body {
     font-family: Arial, sans-serif;
-    max-width: 800px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 20px;
     text-align: center;
-}
-
-h1 {
-    color: #333;
+    background-color: black;
+    color: whitesmoke;
 }
 
 .input-group {
@@ -17,16 +15,17 @@ h1 {
 
 label {
     display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
+    margin-bottom: 10px;
 }
 
-input, select {
+input{
     width: 100%;
     padding: 10px;
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 16px;
+    background: none;
+    color: whitesmoke;
 }
 
 .scrollable-container {
@@ -35,12 +34,15 @@ input, select {
     overflow-y: auto; /* Enable vertical scrolling */
     border: 1px solid #ccc;
     padding: 10px;
+    border: none;
     border-radius: 4px;
+    background: none;
+    scrollbar-color: black #ddd; /* Firefox */
 }
 
 .style-grid {
     display: grid;
-    grid-template-columns: repeat(1, 1fr); /* Two columns */
+    grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     margin-top: 10px;
 }
@@ -50,11 +52,10 @@ input, select {
     width: 100%;
     height: 300px; /* Adjust height as needed */
     overflow: hidden;
-    border: 1px solid #ccc;
     border-radius: 4px;
     cursor: pointer;
     transition: transform 0.2s, background-color 0.3s, opacity 0.2s;
-    opacity: 0.5; /* Default opacity */
+    opacity: 0.6; /* Default opacity */
 }
 
 .style-option img {
@@ -68,14 +69,14 @@ input, select {
 }
 
 .style-option span {
+    width: 100%;
     position: absolute;
-    bottom: 10px; /* Position text near the bottom */
-    left: 10px; /* Align text to the left */
+    bottom: 0; /* Position text near the bottom */
+    left: 0; /* Align text to the left */
     z-index: 2; /* Text is above the image */
     color: white;
-    background: rgba(0, 0, 0, 0.5); /* Semi-transparent background for contrast */
-    padding: 5px 10px;
-    border-radius: 4px;
+    background: black; /* Semi-transparent background for contrast */
+    padding: 10px 10px;
 }
 
 .style-option:hover {
@@ -88,9 +89,9 @@ input, select {
 }
 
 button {
-    background-color: #4CAF50;
     color: white;
-    border: none;
+    border: whitesmoke, 1px solid;
+    background-color: black;
     padding: 10px 20px;
     text-align: center;
     text-decoration: none;
@@ -103,7 +104,8 @@ button {
 }
 
 button:hover {
-    background-color: #45a049;
+    background-color: whitesmoke;
+    color: black;
 }
 
 #result {
@@ -113,7 +115,7 @@ button:hover {
     border-radius: 4px;
     min-height: 50px;
     text-align: left;
-    background-color: #f9f9f9;
+    background-color: whitesmoke;
 }
 
 .history-image {
@@ -153,17 +155,6 @@ button:hover {
     border-radius: 8px;
     margin: 15px 0;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.tts-button {
-    background: #4CAF50;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-top: 10px;
-    transition: all 0.3s;
 }
 
 .error {
@@ -215,12 +206,12 @@ button:hover {
 }
 
 .left-column {
-    flex: 1;
-    display: flex;
+    flex: 2;
 }
 
 .right-column {
     flex: 2;
+    margin-left: 30px;
     border: 1px solid #ddd;
     border-radius: 4px;
     padding: 15px;
