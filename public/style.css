@@ -21,6 +21,7 @@ header h1 {
     text-transform: uppercase;
     font-weight: bold;
     margin-right: 80px;
+    font-family: 'DMSerifDisplay', serif;
 }
 
 header p{
@@ -77,8 +78,9 @@ input{
     height: 295px; /* Adjust height as needed */
     overflow: hidden;
     cursor: pointer;
-    transition: transform 0.2s, background-color 0.3s, opacity 0.2s;
+    transition: transform 0.2s, background-color 0.3s, opacity 0.2s, outline 0.3s ease-in-out;
     opacity: 0.8; /* Default opacity */
+    outline: none; /* No outline by default */
 }
 
 .style-option img {
@@ -86,24 +88,20 @@ input{
     height: 100%;
     object-fit: cover;
     position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 1; /* Image is behind the text */
 }
 
 .style-option span {
     width: 100%;
     position: absolute;
     bottom: 0; /* Position text near the bottom */
-    left: 0; /* Align text to the left */
     z-index: 2; /* Text is above the image */
-    color: white;
-    background: black; /* Semi-transparent background for contrast */
-    padding: 10px 10px;
+    background: black;
+    padding: 10px 10px 10px 5px;
 }
 
 .style-option:hover {
     transform: scale(1.01);
+    outline: 3px solid whitesmoke; /* Outline on hover */
 }
 
 .style-option:hover, .style-option.selected {
@@ -112,6 +110,11 @@ input{
         background-color: whitesmoke;
         color: black;
     }
+}
+
+.style-option.selected {
+    outline: 3px solid whitesmoke; /* Green outline when selected */
+    opacity: 1; /* Full opacity when selected */
 }
 
 button {
